@@ -9,7 +9,7 @@ use std::time::Duration;
 #[derive(Debug)]
 pub enum VttParseError {
     /// The provided data does not conform to the expected format.
-    InvalidFormat,
+    InvalidFormat(String),
     /// The hours component of a timestamp is invalid.
     InvalidHours,
     /// The minutes component of a timestamp is invalid.
@@ -29,7 +29,7 @@ pub enum VttParseError {
 impl fmt::Display for VttParseError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            VttParseError::InvalidFormat => write!(f, "Invalid format"),
+            VttParseError::InvalidFormat(x) => write!(f, "Invalid format: {x}"),
             VttParseError::InvalidHours => write!(f, "Invalid hours format"),
             VttParseError::InvalidMinutes => write!(f, "Invalid minutes format"),
             VttParseError::InvalidSeconds => write!(f, "Invalid seconds format"),
@@ -68,8 +68,8 @@ impl FromStr for VttTimestamp {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut parts = s.split(':');
 
-        let first = parts.next().ok_or(VttParseError::InvalidFormat)?;
-        let second = parts.next().ok_or(VttParseError::InvalidFormat)?;
+        let first = parts.next().ok_or(VttParseError::InvalidFormat(format!("Expected a timestamp first component in '{s}' but found nothing")))?;
+        let second = parts.next().ok_or(VttParseError::InvalidFormat(format!("Expected a timestamp second component in '{s}' but found nothing")))?;
         let third = parts.next();
 
         match third {
@@ -189,7 +189,7 @@ impl FromStr for VttCue {
     /// Parses a `VttCue` from a string.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut lines = s.lines();
-        let first_line = lines.next().ok_or(VttParseError::InvalidFormat)?;
+        let first_line = lines.next().ok_or(VttParseError::InvalidFormat(format!("Expected a line to be present parsing cue from {s}")))?;
 
         let identifier = if !first_line.contains("-->") {
             Some(first_line.to_string())
@@ -198,14 +198,14 @@ impl FromStr for VttCue {
         };
 
         let timing_line = if identifier.is_some() {
-            lines.next().ok_or(VttParseError::InvalidFormat)?
+            lines.next().ok_or(VttParseError::InvalidFormat(format!("Expected a timing line to be present from {s}")))?
         } else {
             first_line
         };
 
         let timing_parts: Vec<&str> = timing_line.split("-->").collect();
         if timing_parts.len() != 2 {
-            return Err(VttParseError::InvalidFormat);
+            return Err(VttParseError::InvalidFormat(format!("Expected timing parts to be present from {s}")));
         }
 
         let start = VttTimestamp::from_str(timing_parts[0].trim())?;
@@ -214,7 +214,7 @@ impl FromStr for VttCue {
         let mut end_part_and_settings = end_and_settings.split_whitespace();
         let end_part = end_part_and_settings
             .next()
-            .ok_or(VttParseError::InvalidFormat)?;
+            .ok_or(VttParseError::InvalidFormat(format!("Expected an end part to be present from {s}")))?;
         let end = VttTimestamp::from_str(end_part)?;
 
         // Build settings string
@@ -550,7 +550,7 @@ impl WebVtt {
         let mut buf_reader = std::io::BufReader::new(reader);
         buf_reader
             .read_to_string(&mut buffer)
-            .map_err(|_| VttParseError::InvalidFormat)?;
+            .map_err(|_| VttParseError::InvalidFormat(format!("Reader read_to_string failed")))?;
         Self::from_str(&buffer)
     }
 }
@@ -630,7 +630,7 @@ impl FromStr for WebVtt {
     /// Parses a `WebVtt` instance from a string.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut lines = s.lines();
-        let first_line = lines.next().ok_or(VttParseError::InvalidFormat)?.trim();
+        let first_line = lines.next().ok_or(VttParseError::InvalidFormat(format!("Expected a first line to be present in {s}")))?.trim();
 
         // Check for WEBVTT header
         if !first_line.starts_with("WEBVTT") {
@@ -660,25 +660,24 @@ impl FromStr for WebVtt {
             }
         }
 
-        // Parse cues
+        // Parse cues using double newline as the separator.
+        // First, join the remaining lines back into a single string.
+        let remaining_text = lines.collect::<Vec<&str>>().join("\n");
+
+        // Then split the text by two consecutive newlines.
+        // This assumes that cues are separated by at least one blank line.
+        let cue_blocks: Vec<&str> = remaining_text
+            .split("\n\n")
+            .filter(|block| !block.trim().is_empty())
+            .collect();
+
         let mut cues = Vec::new();
-        let mut cue_lines = Vec::new();
-
-        for line in lines {
-            if line.trim().is_empty() {
-                if !cue_lines.is_empty() {
-                    cues.push(VttCue::from_str(&cue_lines.join("\n"))?);
-                    cue_lines.clear();
-                }
-            } else {
-                cue_lines.push(line);
-            }
+        for block in cue_blocks {
+            // Trim extra whitespace before parsing each cue.
+            cues.push(VttCue::from_str(block.trim())?);
         }
 
-        // Don't forget the last cue if file doesn't end with empty line
-        if !cue_lines.is_empty() {
-            cues.push(VttCue::from_str(&cue_lines.join("\n"))?);
-        }
+
 
         Ok(WebVtt { header, cues })
     }

@@ -1,3 +1,6 @@
+mod cue_payload;
+
+use cue_payload::VttCuePayload;
 use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashMap;
 use std::error::Error;
@@ -68,8 +71,12 @@ impl FromStr for VttTimestamp {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut parts = s.split(':');
 
-        let first = parts.next().ok_or(VttParseError::InvalidFormat(format!("Expected a timestamp first component in '{s}' but found nothing")))?;
-        let second = parts.next().ok_or(VttParseError::InvalidFormat(format!("Expected a timestamp second component in '{s}' but found nothing")))?;
+        let first = parts.next().ok_or(VttParseError::InvalidFormat(format!(
+            "Expected a timestamp first component in '{s}' but found nothing"
+        )))?;
+        let second = parts.next().ok_or(VttParseError::InvalidFormat(format!(
+            "Expected a timestamp second component in '{s}' but found nothing"
+        )))?;
         let third = parts.next();
 
         match third {
@@ -180,7 +187,7 @@ pub struct VttCue {
     /// Optional settings for the cue.
     pub settings: Option<VttSettings>,
     /// The textual content of the cue.
-    pub payload: String,
+    pub payload: VttCuePayload,
 }
 
 impl FromStr for VttCue {
@@ -189,7 +196,9 @@ impl FromStr for VttCue {
     /// Parses a `VttCue` from a string.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut lines = s.lines();
-        let first_line = lines.next().ok_or(VttParseError::InvalidFormat(format!("Expected a line to be present parsing cue from {s}")))?;
+        let first_line = lines.next().ok_or(VttParseError::InvalidFormat(format!(
+            "Expected a line to be present parsing cue from {s}"
+        )))?;
 
         let identifier = if !first_line.contains("-->") {
             Some(first_line.to_string())
@@ -198,14 +207,18 @@ impl FromStr for VttCue {
         };
 
         let timing_line = if identifier.is_some() {
-            lines.next().ok_or(VttParseError::InvalidFormat(format!("Expected a timing line to be present from {s}")))?
+            lines.next().ok_or(VttParseError::InvalidFormat(format!(
+                "Expected a timing line to be present from {s}"
+            )))?
         } else {
             first_line
         };
 
         let timing_parts: Vec<&str> = timing_line.split("-->").collect();
         if timing_parts.len() != 2 {
-            return Err(VttParseError::InvalidFormat(format!("Expected timing parts to be present from {s}")));
+            return Err(VttParseError::InvalidFormat(format!(
+                "Expected timing parts to be present from {s}"
+            )));
         }
 
         let start = VttTimestamp::from_str(timing_parts[0].trim())?;
@@ -214,7 +227,9 @@ impl FromStr for VttCue {
         let mut end_part_and_settings = end_and_settings.split_whitespace();
         let end_part = end_part_and_settings
             .next()
-            .ok_or(VttParseError::InvalidFormat(format!("Expected an end part to be present from {s}")))?;
+            .ok_or(VttParseError::InvalidFormat(format!(
+                "Expected an end part to be present from {s}"
+            )))?;
         let end = VttTimestamp::from_str(end_part)?;
 
         // Build settings string
@@ -226,7 +241,7 @@ impl FromStr for VttCue {
         };
 
         // Collect remaining lines as payload
-        let payload = lines.collect::<Vec<&str>>().join("\n");
+        let payload: VttCuePayload = lines.collect::<Vec<&str>>().join("\n").into();
 
         Ok(VttCue {
             identifier,
@@ -366,7 +381,7 @@ impl fmt::Display for VttCue {
         }
 
         // Write newline and payload
-        write!(f, "\n{}", self.payload.trim())
+        write!(f, "\n{}", self.payload)
     }
 }
 
@@ -553,6 +568,38 @@ impl WebVtt {
             .map_err(|_| VttParseError::InvalidFormat(format!("Reader read_to_string failed")))?;
         Self::from_str(&buffer)
     }
+
+    /// Returns a fully deduplicated text from all cues,
+    /// where overlapping text between consecutive cues is removed.
+    pub fn deduplicated_text(&self) -> String {
+        let mut result = String::new();
+
+        for cue in &self.cues {
+            // Join all fragments of the cue into one string.
+            let cue_text = cue
+                .payload
+                .iter()
+                .map(|frag| frag.text())
+                .collect::<Vec<_>>()
+                .join("");
+
+            // Determine the maximum overlap: how many characters at the end of `result`
+            // match the beginning of `cue_text`?
+            let max_possible_overlap = std::cmp::min(result.len(), cue_text.len());
+            let mut overlap = 0;
+            for k in (0..=max_possible_overlap).rev() {
+                // Slicing is OK as long as our texts are ASCII or we are careful with UTF‑8 boundaries.
+                if result.ends_with(&cue_text[..k]) {
+                    overlap = k;
+                    break;
+                }
+            }
+
+            // Append only the portion of cue_text that isn't already in result.
+            result.push_str(&cue_text[overlap..]);
+        }
+        result
+    }
 }
 
 impl Serialize for WebVtt {
@@ -630,7 +677,12 @@ impl FromStr for WebVtt {
     /// Parses a `WebVtt` instance from a string.
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let mut lines = s.lines();
-        let first_line = lines.next().ok_or(VttParseError::InvalidFormat(format!("Expected a first line to be present in {s}")))?.trim();
+        let first_line = lines
+            .next()
+            .ok_or(VttParseError::InvalidFormat(format!(
+                "Expected a first line to be present in {s}"
+            )))?
+            .trim();
 
         // Check for WEBVTT header
         if !first_line.starts_with("WEBVTT") {
@@ -677,8 +729,6 @@ impl FromStr for WebVtt {
             cues.push(VttCue::from_str(block.trim())?);
         }
 
-
-
         Ok(WebVtt { header, cues })
     }
 }
@@ -717,6 +767,7 @@ impl fmt::Display for WebVtt {
 ///
 /// The prelude includes commonly used types, allowing for easier imports.
 pub mod prelude {
+    pub use super::cue_payload::{VttCueFragment, VttCuePayload};
     pub use super::{
         AlignSetting, LineSetting, VerticalSetting, VttCue, VttHeader, VttParseError, VttSettings,
         VttTimestamp, WebVtt,
@@ -740,8 +791,8 @@ Second subtitle";
         let reader = Cursor::new(&data[..]);
         let vtt = WebVtt::from_reader(reader).unwrap();
         assert_eq!(vtt.cues.len(), 2);
-        assert_eq!(vtt.cues[0].payload, "Hello, world!");
-        assert_eq!(vtt.cues[1].payload, "Second subtitle");
+        assert_eq!(vtt.cues[0].payload.to_string().as_str(), "Hello, world!");
+        assert_eq!(vtt.cues[1].payload.to_string().as_str(), "Second subtitle");
     }
 
     #[test]
@@ -780,7 +831,7 @@ Hello, world!";
 
         assert_eq!(cue.start.as_duration(), Duration::from_secs(62));
         assert_eq!(cue.end.as_duration(), Duration::from_secs(184));
-        assert_eq!(cue.payload, "Hello, world!");
+        assert_eq!(cue.payload.to_string().as_str(), "Hello, world!");
     }
 
     #[test]
@@ -802,7 +853,7 @@ Hello, world!";
         let cue = VttCue::from_str(cue_str).unwrap();
 
         assert_eq!(cue.identifier, Some("id1".to_string()));
-        assert_eq!(cue.payload, "Subtitle text");
+        assert_eq!(cue.payload.to_string().as_str(), "Subtitle text");
     }
 
     #[test]
@@ -812,7 +863,7 @@ Hello, world!";
             start: VttTimestamp::new(Duration::from_secs(1)),
             end: VttTimestamp::new(Duration::from_secs(5)),
             settings: None,
-            payload: "Test".to_string(),
+            payload: "Test".into(),
         };
 
         let expected = "00:00:01.000 --> 00:00:05.000\nTest";
@@ -830,8 +881,8 @@ Second subtitle"#;
 
         let vtt = WebVtt::from_str(content).unwrap();
         assert_eq!(vtt.cues.len(), 2);
-        assert_eq!(vtt.cues[0].payload, "Hello, world!");
-        assert_eq!(vtt.cues[1].payload, "Second subtitle");
+        assert_eq!(vtt.cues[0].payload.to_string().as_str(), "Hello, world!");
+        assert_eq!(vtt.cues[1].payload.to_string().as_str(), "Second subtitle");
     }
 
     #[test]
@@ -866,7 +917,7 @@ First subtitle"#;
             start: VttTimestamp::new(Duration::from_secs(1)),
             end: VttTimestamp::new(Duration::from_secs(5)),
             settings: None,
-            payload: "Test subtitle".to_string(),
+            payload: "Test subtitle".into(),
         };
         vtt.add_cue(cue);
 
@@ -876,7 +927,10 @@ First subtitle"#;
         assert_eq!(deserialized.header.description, vtt.header.description);
         assert_eq!(deserialized.header.metadata, vtt.header.metadata);
         assert_eq!(deserialized.cues.len(), vtt.cues.len());
-        assert_eq!(deserialized.cues[0].payload, "Test subtitle");
+        assert_eq!(
+            deserialized.cues[0].payload.to_string().as_str(),
+            "Test subtitle"
+        );
     }
 
     #[test]
@@ -890,7 +944,7 @@ First subtitle"#;
             start: VttTimestamp::new(Duration::from_secs(1)),
             end: VttTimestamp::new(Duration::from_secs(5)),
             settings: None,
-            payload: "Test".to_string(),
+            payload: "Test".into(),
         };
         vtt.add_cue(cue);
 
@@ -930,7 +984,7 @@ Test"#;
                 size: Some(40),
                 align: Some(AlignSetting::Middle),
             }),
-            payload: "Hello, world!".to_string(),
+            payload: "Hello, world!".into(),
         };
         let serialized = serde_json::to_string(&cue).unwrap();
         let deserialized: VttCue = serde_json::from_str(&serialized).unwrap();

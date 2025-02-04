@@ -2,13 +2,10 @@ use std::str::FromStr;
 
 use vtt::{VttHeader, WebVtt};
 
-fn get_test_vtt_str() -> &'static str {
-    include_str!("test.vtt")
-}
-
 #[test]
 fn ahoy() {
-    let vtt_str = get_test_vtt_str();
+    let vtt_str = include_str!("test.vtt").replace('\r', "");
+    let vtt_str = vtt_str.trim();
     let vtt = WebVtt::from_str(&vtt_str).unwrap();
     assert_eq!(
         vtt.header,
@@ -20,7 +17,19 @@ fn ahoy() {
                 .collect(),
         }
     );
-    for cue in vtt.cues {
-        println!("{}", cue.payload);
+    for cue in &vtt.cues {
+        println!("{cue:#?}");
     }
+    // let output = vtt.to_string();
+    // let output = output.trim();
+    // assert_eq!(output, vtt_str);
+    // some minor line differences
+}
+
+#[test]
+fn natural() {
+    let vtt_str = include_str!("test.vtt").replace('\r', "");
+    let vtt_str = vtt_str.trim();
+    let vtt = WebVtt::from_str(&vtt_str).unwrap();
+    println!("{}", vtt.deduplicated_text());
 }

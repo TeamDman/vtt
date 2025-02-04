@@ -9,6 +9,51 @@ when<00:00:00.199><c> I</c><00:00:00.280><c> started</c><00:00:00.560><c> workin
 00:00:01.309 --> 00:00:01.319 align:start position:0%
 when I started working on embedded
  
+
 00:00:01.319 --> 00:00:03.389 align:start position:0%
 when I started working on embedded
 systems<00:00:01.680><c> over</c><00:00:01.880><c> 10</c><00:00:02.080><c> years</c><00:00:02.280><c> ago</c><00:00:02.760><c> the</c><00:00:02.919><c> developer</c>
+
+00:00:03.389 --> 00:00:03.399 align:start position:0%
+systems over 10 years ago the developer
+ 
+
+00:00:03.399 --> 00:00:05.030 align:start position:0%
+systems over 10 years ago the developer
+experience<00:00:03.800><c> was</c><00:00:04.040><c> often</c><00:00:04.279><c> determined</c><00:00:04.799><c> by</c><00:00:04.920><c> your</c>
+
+00:00:05.030 --> 00:00:05.040 align:start position:0%
+experience was often determined by your
+ 
+
+00:00:05.040 --> 00:00:06.990 align:start position:0%
+experience was often determined by your
+microcontroller<00:00:05.759><c> vendor</c><00:00:06.359><c> which</c><00:00:06.520><c> meant</c>
+
+00:00:06.990 --> 00:00:07.000 align:start position:0%
+microcontroller vendor which meant
+ 
+
+00:00:07.000 --> 00:00:09.589 align:start position:0%
+microcontroller vendor which meant
+writing<00:00:07.319><c> in</c><00:00:07.480><c> C</c><00:00:08.200><c> using</c><00:00:08.480><c> the</c><00:00:08.599><c> vendor's</c><00:00:09.080><c> compiler</c>
+
+00:00:09.589 --> 00:00:09.599 align:start position:0%
+writing in C using the vendor's compiler
+ 
+
+00:00:09.599 --> 00:00:11.950 align:start position:0%
+writing in C using the vendor's compiler
+and<00:00:09.800><c> IDE</c><00:00:10.800><c> their</c><00:00:11.000><c> in</c><00:00:11.160><c> circuit</c><00:00:11.480><c> debugger</c>
+
+00:00:11.950 --> 00:00:11.960 align:start position:0%
+and IDE their in circuit debugger
+ 
+
+00:00:11.960 --> 00:00:14.070 align:start position:0%
+and IDE their in circuit debugger
+hardware<00:00:12.719><c> and</c><00:00:12.840><c> working</c><00:00:13.120><c> in</c>
+
+00:00:14.070 --> 00:00:14.080 align:start position:0%
+hardware and working in
+ 

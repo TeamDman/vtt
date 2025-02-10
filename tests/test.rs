@@ -28,6 +28,8 @@ fn ahoy() {
 
 #[test]
 fn natural() {
+    // https://youtu.be/l8L9Z2vmMTQ
+    // https://youtu.be/TOAynddiu5M
     let vtt_str = include_str!("test.vtt").replace('\r', "");
     let vtt_str = vtt_str.trim();
     let vtt = WebVtt::from_str(&vtt_str).unwrap();

@@ -576,21 +576,20 @@ impl WebVtt {
 
         for cue in &self.cues {
             // Join all fragments of the cue into one string.
-            let cue_text = cue
-                .payload
-                .iter()
-                .map(|frag| frag.text())
-                .collect::<Vec<_>>()
-                .join("");
+            let cue_text: String = cue.payload.iter().map(|frag| frag.text()).collect();
 
-            // Determine the maximum overlap: how many characters at the end of `result`
-            // match the beginning of `cue_text`?
-            let max_possible_overlap = std::cmp::min(result.len(), cue_text.len());
+            // Build a vector of valid character-boundary indices.
+            let mut valid_indices = cue_text
+                .char_indices()
+                .map(|(i, _)| i)
+                .collect::<Vec<usize>>();
+            valid_indices.push(cue_text.len()); // add the final boundary
+
             let mut overlap = 0;
-            for k in (0..=max_possible_overlap).rev() {
-                // Slicing is OK as long as our texts are ASCII or we are careful with UTF‑8 boundaries.
-                if result.ends_with(&cue_text[..k]) {
-                    overlap = k;
+            // Iterate in reverse order over valid indices.
+            for &idx in valid_indices.iter().rev() {
+                if result.ends_with(&cue_text[..idx]) {
+                    overlap = idx;
                     break;
                 }
             }
